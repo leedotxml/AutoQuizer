@@ -1,0 +1,57 @@
+Generate a complete Python project for a multiplayer online car logo guessing game with web interface. Requirements:
+
+1. **Backend Server (Python)**
+   - Use Flask or FastAPI.
+   - Handle multiple teams connecting from different locations.
+   - Teams register with a team name and list of member names.
+   - Keep track of team scores, rounds, current turn, and game status.
+   - Each round displays a car logo image for 30 seconds.
+   - Teams can submit guesses, which are case-insensitive (e.g., 'toyota' = 'TOYOTA').
+   - Support 3 rounds or as many rounds as the number of loaded logos.
+   - Admin can start the game, move to next round, add/remove logos, and manage alternative guesses.
+   - Provide API endpoints:
+     - `/register_team` (POST) – register a team.
+     - `/submit_guess` (POST) – submit a guess.
+     - `/status` (GET) – get current game state for a team.
+     - `/admin/start_game` (POST) – start the game.
+     - `/admin/logos` (GET, POST, DELETE) – manage logos and alternative guesses.
+
+2. **Logo & Guess Management**
+   - Store logos, correct answers, and alternative guesses in a local SQLite database or JSON file.
+   - Provide backend logic to:
+     - Fetch next logo for the round.
+     - Validate guesses against correct and alternative answers.
+     - Update team scores.
+
+3. **Web Client for Teams**
+   - HTML/CSS/JS frontend served by Flask/FastAPI.
+   - Team registration form (team name + members).
+   - Display current logo image with a 30-second timer countdown.
+   - Submit guesses through a form.
+   - Show feedback if the guess is correct or incorrect.
+   - Display current score, round, and game status.
+   - Auto-refresh status every few seconds via AJAX or fetch API.
+
+4. **Admin Dashboard**
+   - Web-based interface to:
+     - View all team scores in real-time.
+     - Start the game or advance rounds.
+     - Add or remove logos and alternative guesses.
+     - Auto-refresh to reflect real-time updates.
+
+5. **Game Mechanics**
+   - Each round lasts 30 seconds.
+   - Accept multiple team guesses simultaneously.
+   - Track and update scores in real-time.
+   - After all rounds, show final scores and highlight the winner.
+   - Ensure guesses are not case sensitive.
+   - Use WebSocket or polling for real-time updates.
+
+6. **Extras**
+   - Simple project structure:
+     - `server.py` (main backend)
+     - `templates/` (HTML templates)
+     - `static/` (CSS, JS, images)
+     - `data/logos.json` or `logos.db` for storing logos and answers
+   - Include comments in the code for clarity.
+   - Provide instructions on how to run the server and connect multiple clients.
