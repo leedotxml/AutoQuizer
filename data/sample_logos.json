@@ -1,0 +1,62 @@
+[
+    {
+        "name": "Toyota Logo",
+        "image_url": "https://logos-world.net/wp-content/uploads/2020/04/Toyota-Logo.png",
+        "correct_answer": "Toyota",
+        "alternative_answers": ["Toyota Motor", "Toyota Motors"]
+    },
+    {
+        "name": "BMW Logo",
+        "image_url": "https://logos-world.net/wp-content/uploads/2020/04/BMW-Logo.png",
+        "correct_answer": "BMW",
+        "alternative_answers": ["Bayerische Motoren Werke", "BMW Group"]
+    },
+    {
+        "name": "Mercedes-Benz Logo",
+        "image_url": "https://logos-world.net/wp-content/uploads/2020/04/Mercedes-Benz-Logo.png",
+        "correct_answer": "Mercedes-Benz",
+        "alternative_answers": ["Mercedes", "Benz", "Mercedes Benz"]
+    },
+    {
+        "name": "Audi Logo",
+        "image_url": "https://logos-world.net/wp-content/uploads/2020/04/Audi-Logo.png",
+        "correct_answer": "Audi",
+        "alternative_answers": ["Audi AG"]
+    },
+    {
+        "name": "Volkswagen Logo",
+        "image_url": "https://logos-world.net/wp-content/uploads/2020/04/Volkswagen-Logo.png",
+        "correct_answer": "Volkswagen",
+        "alternative_answers": ["VW", "Volkswagen Group"]
+    },
+    {
+        "name": "Ford Logo",
+        "image_url": "https://logos-world.net/wp-content/uploads/2020/04/Ford-Logo.png",
+        "correct_answer": "Ford",
+        "alternative_answers": ["Ford Motor Company", "Ford Motors"]
+    },
+    {
+        "name": "Honda Logo",
+        "image_url": "https://logos-world.net/wp-content/uploads/2020/04/Honda-Logo.png",
+        "correct_answer": "Honda",
+        "alternative_answers": ["Honda Motor", "Honda Motors"]
+    },
+    {
+        "name": "Nissan Logo",
+        "image_url": "https://logos-world.net/wp-content/uploads/2020/04/Nissan-Logo.png",
+        "correct_answer": "Nissan",
+        "alternative_answers": ["Nissan Motor", "Nissan Motors"]
+    },
+    {
+        "name": "Chevrolet Logo",
+        "image_url": "https://logos-world.net/wp-content/uploads/2020/04/Chevrolet-Logo.png",
+        "correct_answer": "Chevrolet",
+        "alternative_answers": ["Chevy", "Chevrolet Motor"]
+    },
+    {
+        "name": "Hyundai Logo",
+        "image_url": "https://logos-world.net/wp-content/uploads/2020/04/Hyundai-Logo.png",
+        "correct_answer": "Hyundai",
+        "alternative_answers": ["Hyundai Motor", "Hyundai Motors"]
+    }
+]

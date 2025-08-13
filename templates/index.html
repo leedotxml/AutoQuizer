@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car Logo Guessing Game</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8 col-lg-6">
+                <div class="text-center mb-5">
+                    <h1 class="display-4 mb-3">
+                        <i class="fas fa-car text-primary me-3"></i>
+                        Car Logo Game
+                    </h1>
+                    <p class="lead">Test your knowledge of car brands in this exciting multiplayer game!</p>
+                </div>
+                
+                <div class="card shadow">
+                    <div class="card-header">
+                        <h3 class="card-title mb-0">
+                            <i class="fas fa-users me-2"></i>
+                            Team Registration
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <form id="registrationForm">
+                            <div class="mb-3">
+                                <label for="teamName" class="form-label">Team Name</label>
+                                <input type="text" class="form-control" id="teamName" required placeholder="Enter your team name">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Team Members</label>
+                                <div id="membersContainer">
+                                    <div class="input-group mb-2">
+                                        <input type="text" class="form-control member-input" placeholder="Member 1 name" required>
+                                        <button type="button" class="btn btn-outline-danger remove-member" disabled>
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="addMemberBtn">
+                                    <i class="fas fa-plus me-1"></i>
+                                    Add Member
+                                </button>
+                            </div>
+                            
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-play me-2"></i>
+                                    Register Team
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                
+                <div class="text-center mt-4">
+                    <a href="/admin" class="btn btn-outline-secondary">
+                        <i class="fas fa-cog me-2"></i>
+                        Admin Dashboard
+                    </a>
+                </div>
+                
+                <!-- Loading spinner -->
+                <div id="loadingSpinner" class="text-center mt-4" style="display: none;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Registering team...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const registrationForm = document.getElementById('registrationForm');
+            const membersContainer = document.getElementById('membersContainer');
+            const addMemberBtn = document.getElementById('addMemberBtn');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            
+            // Add member functionality
+            addMemberBtn.addEventListener('click', function() {
+                const memberCount = membersContainer.children.length;
+                if (memberCount < 10) { // Limit to 10 members
+                    const memberDiv = document.createElement('div');
+                    memberDiv.className = 'input-group mb-2';
+                    memberDiv.innerHTML = `
+                        <input type="text" class="form-control member-input" placeholder="Member ${memberCount + 1} name" required>
+                        <button type="button" class="btn btn-outline-danger remove-member">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    `;
+                    membersContainer.appendChild(memberDiv);
+                    updateRemoveButtons();
+                }
+            });
+            
+            // Remove member functionality
+            membersContainer.addEventListener('click', function(e) {
+                if (e.target.classList.contains('remove-member') || e.target.parentElement.classList.contains('remove-member')) {
+                    const memberDiv = e.target.closest('.input-group');
+                    if (membersContainer.children.length > 1) {
+                        memberDiv.remove();
+                        updateRemoveButtons();
+                        updatePlaceholders();
+                    }
+                }
+            });
+            
+            function updateRemoveButtons() {
+                const removeButtons = membersContainer.querySelectorAll('.remove-member');
+                removeButtons.forEach(btn => {
+                    btn.disabled = membersContainer.children.length <= 1;
+                });
+            }
+            
+            function updatePlaceholders() {
+                const inputs = membersContainer.querySelectorAll('.member-input');
+                inputs.forEach((input, index) => {
+                    input.placeholder = `Member ${index + 1} name`;
+                });
+            }
+            
+            // Form submission
+            registrationForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const teamName = document.getElementById('teamName').value.trim();
+                const memberInputs = membersContainer.querySelectorAll('.member-input');
+                const members = Array.from(memberInputs)
+                    .map(input => input.value.trim())
+                    .filter(name => name.length > 0);
+                
+                if (!teamName) {
+                    alert('Please enter a team name');
+                    return;
+                }
+                
+                if (members.length === 0) {
+                    alert('Please add at least one team member');
+                    return;
+                }
+                
+                // Show loading spinner
+                registrationForm.style.display = 'none';
+                loadingSpinner.style.display = 'block';
+                
+                // Submit registration
+                fetch('/api/register_team', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        team_name: teamName,
+                        members: members
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = data.redirect_url;
+                    } else {
+                        alert(data.error || 'Registration failed');
+                        registrationForm.style.display = 'block';
+                        loadingSpinner.style.display = 'none';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Registration failed. Please try again.');
+                    registrationForm.style.display = 'block';
+                    loadingSpinner.style.display = 'none';
+                });
+            });
+        });
+    </script>
+</body>
+</html>
