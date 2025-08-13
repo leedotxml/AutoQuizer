@@ -47,7 +47,38 @@ A multiplayer online car logo guessing game built with Flask and vanilla JavaScr
    pip install flask flask-cors flask-sqlalchemy
    ```
 
-3. **Set environment variables** (optional):
+3. **Run the installation script**:
+   ```bash
+   # Method 1: Using the bash script (Linux/macOS/WSL)
+   chmod +x install.sh
+   ./install.sh
+   
+   # Method 2: Using the Python script (All platforms)
+   python3 setup.py
+   ```
+
+4. **Start the game**:
+   ```bash
+   # On Linux/macOS
+   ./start_game.sh
+   
+   # On Windows
+   start_game.bat
+   
+   # Or directly
+   python3 main.py
+   ```
+
+## Quick Installation
+
+### One-Line Install (Linux/macOS/WSL):
+```bash
+curl -sSL https://raw.githubusercontent.com/your-repo/car-logo-game/main/install.sh | bash
+```
+
+### Manual Installation:
+
+1. **Set environment variables** (optional):
    ```bash
    export SESSION_SECRET="your-secret-key-here"
    export DATABASE_URL="sqlite:///game.db"
