@@ -92,9 +92,14 @@ class AdminDashboard {
         }
         
         // Update status badge
-        if (game.status === 'active') {
+        if (game.status === 'active' && game.round_active) {
             this.elements.currentStatus.textContent = 'Game Active';
             this.elements.currentStatus.className = 'badge bg-success';
+            this.elements.startGameBtn.style.display = 'none';
+            this.elements.nextRoundBtn.style.display = 'none';
+        } else if (game.status === 'active' && !game.round_active) {
+            this.elements.currentStatus.textContent = 'Question Complete - Auto Advancing';
+            this.elements.currentStatus.className = 'badge bg-warning';
             this.elements.startGameBtn.style.display = 'none';
             this.elements.nextRoundBtn.style.display = 'none';
         } else if (game.status === 'round_complete') {
