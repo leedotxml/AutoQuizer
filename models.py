@@ -52,6 +52,7 @@ class Guess(db.Model):
     team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=False)
     game_id = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=False)
     round_number = db.Column(db.Integer, nullable=False)
+
     guess = db.Column(db.String(100), nullable=False)
     is_correct = db.Column(db.Boolean, default=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)

@@ -55,22 +55,27 @@ with app.app_context():
         logging.warning(f"Schema migration skipped: {e}")
     
     # Load sample logos if none exist
-    if Logo.query.count() == 0:
-        try:
-            with open('data/sample_logos.json', 'r') as f:
-                sample_logos = json.load(f)
-                for logo_data in sample_logos:
-                    logo = Logo(
-                        name=logo_data['name'],
-                        image_url=logo_data['image_url'],
-                        correct_answer=logo_data['correct_answer'],
-                        alternative_answers=json.dumps(logo_data.get('alternative_answers', []))
-                    )
-                    db.session.add(logo)
-                db.session.commit()
-                logging.info(f"Loaded {len(sample_logos)} sample logos")
-        except FileNotFoundError:
-            logging.warning("Sample logos file not found, starting with empty logo database")
+    try:
+        logo_count = Logo.query.count()
+        if logo_count == 0:
+            try:
+                with open('data/sample_logos.json', 'r') as f:
+                    sample_logos = json.load(f)
+                    for logo_data in sample_logos:
+                        logo = Logo(
+                            name=logo_data['name'],
+                            image_url=logo_data['image_url'],
+                            correct_answer=logo_data['correct_answer'],
+                            alternative_answers=json.dumps(logo_data.get('alternative_answers', []))
+                        )
+                        db.session.add(logo)
+                    db.session.commit()
+                    logging.info(f"Loaded {len(sample_logos)} sample logos")
+            except FileNotFoundError:
+                logging.warning("Sample logos file not found, starting with empty logo database")
+    except Exception as e:
+        logging.warning(f"Could not check logo count: {e}")
+        db.session.rollback()
 
 @app.route('/')
 def index():
@@ -87,9 +92,33 @@ def team_dashboard(team_name):
     return render_template('team.html', team=team)
 
 @app.route('/admin')
+def admin():
+    """Admin login page"""
+    return render_template('admin_login.html')
+
+@app.route('/admin/dashboard')
 def admin_dashboard():
-    """Admin dashboard for game management"""
+    """Protected admin dashboard"""
     return render_template('admin.html')
+
+@app.route('/api/admin/login', methods=['POST'])
+def admin_login():
+    """Admin login with password"""
+    try:
+        data = request.get_json()
+        password = data.get('password', '')
+        
+        # Simple password check (you can change this)
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')
+        
+        if password == admin_password:
+            return jsonify({'success': True, 'redirect_url': '/admin/dashboard'})
+        else:
+            return jsonify({'error': 'Invalid password'}), 401
+            
+    except Exception as e:
+        logging.error(f"Admin login error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 # API Endpoints
 
@@ -152,15 +181,18 @@ def submit_guess():
         if not game:
             return jsonify({'error': 'No active game'}), 400
         
-        # Check if team already guessed for this round
-        existing_guess = Guess.query.filter_by(
-            team_id=team.id,
-            game_id=game.id,
-            round_number=game.current_round
+        # Simple approach: Allow one guess per question per team per game
+        # Check based on current logo ID to track questions
+        logo_id_str = str(game.current_logo_id) 
+        existing_guess = Guess.query.filter(
+            Guess.team_id == team.id,
+            Guess.game_id == game.id,
+            Guess.round_number == game.current_round,
+            Guess.guess.like(f'%{logo_id_str}%')
         ).first()
         
         if existing_guess:
-            return jsonify({'error': 'Team has already submitted a guess for this round'}), 400
+            return jsonify({'error': 'Team has already submitted a guess for this question'}), 400
         
         # Get current logo
         logo = Logo.query.get(game.current_logo_id)
@@ -178,12 +210,13 @@ def submit_guess():
         
         is_correct = guess in correct_answers
         
-        # Save guess
+        # Save guess with logo ID to track questions properly
+        guess_with_id = f"{guess}_{game.current_logo_id}"
         guess_obj = Guess(
             team_id=team.id,
             game_id=game.id,
             round_number=game.current_round,
-            guess=guess,
+            guess=guess_with_id,
             is_correct=is_correct,
             timestamp=datetime.utcnow()
         )
@@ -228,13 +261,15 @@ def get_team_status(team_name):
         if game.current_logo_id:
             logo = Logo.query.get(game.current_logo_id)
         
-        # Check if team has guessed this round
+        # Check if team has guessed for this specific logo 
         has_guessed = False
         if game and logo:
-            existing_guess = Guess.query.filter_by(
-                team_id=team.id,
-                game_id=game.id,
-                round_number=game.current_round
+            logo_id_str = str(game.current_logo_id)
+            existing_guess = Guess.query.filter(
+                Guess.team_id == team.id,
+                Guess.game_id == game.id,
+                Guess.round_number == game.current_round,
+                Guess.guess.like(f'%{logo_id_str}%')
             ).first()
             has_guessed = existing_guess is not None
         
