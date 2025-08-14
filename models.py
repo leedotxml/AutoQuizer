@@ -33,11 +33,14 @@ class Logo(db.Model):
 class Game(db.Model):
     """Game model for tracking game sessions"""
     id = db.Column(db.Integer, primary_key=True)
-    status = db.Column(db.String(20), default='waiting')  # waiting, active, finished
+    status = db.Column(db.String(20), default='waiting')  # waiting, active, finished, round_complete
     current_round = db.Column(db.Integer, default=1)
-    total_rounds = db.Column(db.Integer, default=3)
+    total_rounds = db.Column(db.Integer, default=1)
+    current_question = db.Column(db.Integer, default=1)  # Question number within current round (1-10)
+    questions_per_round = db.Column(db.Integer, default=10)
     current_logo_id = db.Column(db.Integer, db.ForeignKey('logo.id'))
     round_start_time = db.Column(db.DateTime)
+    used_logo_ids = db.Column(db.Text)  # JSON string of used logo IDs
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     def __repr__(self):

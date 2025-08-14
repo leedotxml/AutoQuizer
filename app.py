@@ -37,6 +37,23 @@ game_manager = GameManager()
 with app.app_context():
     db.create_all()
     
+    # Handle database schema migration for new game features
+    try:
+        # Check if we need to add new columns
+        from sqlalchemy import text
+        result = db.session.execute(text("PRAGMA table_info(game)"))
+        columns = [row[1] for row in result.fetchall()]
+        
+        if 'current_question' not in columns:
+            # Add new columns for question tracking
+            db.session.execute(text("ALTER TABLE game ADD COLUMN current_question INTEGER DEFAULT 1"))
+            db.session.execute(text("ALTER TABLE game ADD COLUMN questions_per_round INTEGER DEFAULT 10"))
+            db.session.execute(text("ALTER TABLE game ADD COLUMN used_logo_ids TEXT"))
+            db.session.commit()
+            logging.info("Database schema updated with new game features")
+    except Exception as e:
+        logging.warning(f"Schema migration skipped: {e}")
+    
     # Load sample logos if none exist
     if Logo.query.count() == 0:
         try:
@@ -231,11 +248,13 @@ def get_team_status(team_name):
             'game_status': game.status,
             'current_round': game.current_round,
             'total_rounds': game.total_rounds,
+            'current_question': getattr(game, 'current_question', 1),
+            'questions_per_round': getattr(game, 'questions_per_round', 10),
             'team_score': team.score,
             'logo_url': logo.image_url if logo else None,
             'has_guessed': has_guessed,
             'time_remaining': int(time_remaining),
-            'round_active': time_remaining > 0
+            'round_active': time_remaining > 0 and game.status == 'active'
         })
         
     except Exception as e:
@@ -305,9 +324,11 @@ def get_admin_status():
                 'status': game.status,
                 'current_round': game.current_round,
                 'total_rounds': game.total_rounds,
+                'current_question': getattr(game, 'current_question', 1),
+                'questions_per_round': getattr(game, 'questions_per_round', 10),
                 'current_logo': current_logo,
                 'time_remaining': int(time_remaining),
-                'round_active': time_remaining > 0
+                'round_active': time_remaining > 0 and game.status == 'active'
             }
         
         return jsonify({
@@ -339,12 +360,16 @@ def start_game():
         if not logos:
             return jsonify({'error': 'No logos available. Please add logos first.'}), 400
         
-        # Create new game
-        total_rounds = min(len(logos), 3)  # Max 3 rounds or number of logos
+        # Create new game - 10 questions per round
+        questions_per_round = 10
+        total_rounds = max(1, (len(logos) + questions_per_round - 1) // questions_per_round)  # Round up division
         game = Game(
             status='active',
             current_round=1,
             total_rounds=total_rounds,
+            current_question=1,
+            questions_per_round=questions_per_round,
+            used_logo_ids='[]',
             created_at=datetime.utcnow()
         )
         db.session.add(game)
@@ -364,11 +389,11 @@ def start_game():
 
 @app.route('/api/admin/next_round', methods=['POST'])
 def next_round():
-    """Advance to the next round"""
+    """Advance to the next round (admin sends 'NEXT ROUND')"""
     try:
-        game = Game.query.filter_by(status='active').first()
+        game = Game.query.filter_by(status='round_complete').first()
         if not game:
-            return jsonify({'error': 'No active game'}), 400
+            return jsonify({'error': 'No round waiting to advance'}), 400
         
         if game.current_round >= game.total_rounds:
             # End the game
@@ -388,6 +413,30 @@ def next_round():
         
     except Exception as e:
         logging.error(f"Error advancing round: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/admin/next_question', methods=['POST'])
+def next_question():
+    """Advance to the next question (automatic after 30 seconds)"""
+    try:
+        game = Game.query.filter_by(status='active').first()
+        if not game:
+            return jsonify({'error': 'No active game'}), 400
+        
+        logos = Logo.query.all()
+        result = game_manager.advance_question(game, logos)
+        
+        db.session.commit()
+        
+        if game.status == 'round_complete':
+            logging.info(f"Round {game.current_round} completed, waiting for admin")
+            return jsonify({'success': True, 'round_complete': True})
+        else:
+            logging.info(f"Advanced to question {game.current_question} in round {game.current_round}")
+            return jsonify({'success': True, 'current_question': game.current_question})
+        
+    except Exception as e:
+        logging.error(f"Error advancing question: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/admin/logos', methods=['GET'])

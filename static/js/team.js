@@ -16,6 +16,7 @@ class TeamDashboard {
             gameActive: document.getElementById('gameActive'),
             gameFinished: document.getElementById('gameFinished'),
             roundInfo: document.getElementById('roundInfo'),
+            questionInfo: document.getElementById('questionInfo'),
             timeRemaining: document.getElementById('timeRemaining'),
             currentLogo: document.getElementById('currentLogo'),
             guessForm: document.getElementById('guessForm'),
@@ -99,6 +100,13 @@ class TeamDashboard {
         // Update round info
         if (this.elements.roundInfo) {
             this.elements.roundInfo.textContent = `Round ${gameState.current_round} of ${gameState.total_rounds}`;
+        }
+        
+        // Update question info
+        if (this.elements.questionInfo) {
+            const currentQuestion = gameState.current_question || 1;
+            const questionsPerRound = gameState.questions_per_round || 10;
+            this.elements.questionInfo.textContent = `Question ${currentQuestion} of ${questionsPerRound}`;
         }
         
         // Update logo

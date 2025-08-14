@@ -3,6 +3,7 @@ class AdminDashboard {
         this.currentGameState = null;
         this.updateInterval = null;
         this.timerInterval = null;
+        this.autoProgressInterval = null;
         
         this.initializeElements();
         this.bindEvents();
@@ -15,6 +16,8 @@ class AdminDashboard {
             roundInfo: document.getElementById('roundInfo'),
             currentRound: document.getElementById('currentRound'),
             totalRounds: document.getElementById('totalRounds'),
+            currentQuestion: document.getElementById('currentQuestion'),
+            questionsPerRound: document.getElementById('questionsPerRound'),
             timeProgress: document.getElementById('timeProgress'),
             timeRemaining: document.getElementById('timeRemaining'),
             startGameBtn: document.getElementById('startGameBtn'),
@@ -93,6 +96,11 @@ class AdminDashboard {
             this.elements.currentStatus.textContent = 'Game Active';
             this.elements.currentStatus.className = 'badge bg-success';
             this.elements.startGameBtn.style.display = 'none';
+            this.elements.nextRoundBtn.style.display = 'none';
+        } else if (game.status === 'round_complete') {
+            this.elements.currentStatus.textContent = 'Round Complete - Waiting';
+            this.elements.currentStatus.className = 'badge bg-warning';
+            this.elements.startGameBtn.style.display = 'none';
             this.elements.nextRoundBtn.style.display = 'inline-block';
         } else if (game.status === 'finished') {
             this.elements.currentStatus.textContent = 'Game Finished';
@@ -102,13 +110,20 @@ class AdminDashboard {
         }
         
         // Update round info
-        if (game.status === 'active') {
+        if (game.status === 'active' || game.status === 'round_complete') {
             this.elements.roundInfo.style.display = 'block';
             this.elements.currentRound.textContent = game.current_round;
             this.elements.totalRounds.textContent = game.total_rounds;
+            this.elements.currentQuestion.textContent = game.current_question || 1;
+            this.elements.questionsPerRound.textContent = game.questions_per_round || 10;
             
             // Update timer
             this.updateTimer(game.time_remaining);
+            
+            // Set up automatic question progression for active games
+            if (game.status === 'active') {
+                this.setupAutoProgress(game.time_remaining);
+            }
             
             // Update next round button
             if (game.current_round >= game.total_rounds) {
@@ -123,6 +138,46 @@ class AdminDashboard {
         } else {
             this.elements.roundInfo.style.display = 'none';
             this.clearTimer();
+            this.clearAutoProgress();
+        }
+    }
+    
+    setupAutoProgress(timeRemaining) {
+        // Clear existing auto-progress
+        this.clearAutoProgress();
+        
+        // Set timer to advance question when time runs out
+        if (timeRemaining > 0) {
+            this.autoProgressInterval = setTimeout(() => {
+                this.advanceQuestion();
+            }, timeRemaining * 1000);
+        }
+    }
+    
+    async advanceQuestion() {
+        try {
+            const response = await fetch('/api/admin/next_question', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                // Update immediately
+                this.updateStatus();
+            }
+        } catch (error) {
+            console.error('Failed to advance question:', error);
+        }
+    }
+    
+    clearAutoProgress() {
+        if (this.autoProgressInterval) {
+            clearTimeout(this.autoProgressInterval);
+            this.autoProgressInterval = null;
         }
     }
     
@@ -395,6 +450,7 @@ class AdminDashboard {
             clearInterval(this.updateInterval);
         }
         this.clearTimer();
+        this.clearAutoProgress();
     }
 }
 

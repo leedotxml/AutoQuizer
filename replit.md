@@ -30,12 +30,16 @@ Uses SQLite as the primary database with SQLAlchemy ORM for data modeling. The d
 The system initializes with sample logo data from a JSON file and supports dynamic logo management through the admin interface.
 
 ## Game Logic Design
-Implements a round-based game system where:
-- Each round displays a randomly selected logo for 30 seconds
+Implements a question-based round system where:
+- Each round contains exactly 10 questions
+- Each question displays a randomly selected logo for exactly 30 seconds
+- Questions automatically advance after 30 seconds
+- After 10 questions, the round completes and waits for admin to send "NEXT ROUND"
+- Total rounds = total available logos ÷ 10 (rounded up)
 - Teams can submit case-insensitive guesses with support for alternative correct answers
 - Scoring is tracked in real-time with immediate feedback
 - Logo selection prevents repeats within the same game session
-- Timer management handles round expiration and automatic progression
+- Automatic question progression with admin-controlled round advancement
 
 ## Security and Configuration
 Basic security measures include:
