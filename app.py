@@ -395,9 +395,9 @@ def start_game():
         if not logos:
             return jsonify({'error': 'No logos available. Please add logos first.'}), 400
         
-        # Create new game - 10 questions per round
-        questions_per_round = 10
-        total_rounds = max(1, (len(logos) + questions_per_round - 1) // questions_per_round)  # Round up division
+        # Create new game - single round with all questions
+        questions_per_round = len(logos)  # All questions in one round
+        total_rounds = 1  # Only one round
         game = Game(
             status='active',
             current_round=1,
@@ -463,9 +463,9 @@ def next_question():
         
         db.session.commit()
         
-        if game.status == 'round_complete':
-            logging.info(f"Round {game.current_round} completed, waiting for admin")
-            return jsonify({'success': True, 'round_complete': True})
+        if game.status == 'finished':
+            logging.info(f"Game completed with all questions answered")
+            return jsonify({'success': True, 'game_finished': True})
         else:
             logging.info(f"Advanced to question {game.current_question} in round {game.current_round}")
             return jsonify({'success': True, 'current_question': game.current_question})
@@ -547,6 +547,79 @@ def delete_logo(logo_id):
         
     except Exception as e:
         logging.error(f"Error deleting logo: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/admin/stop_game', methods=['POST'])
+def stop_game():
+    """Stop the current game immediately"""
+    try:
+        game = Game.query.filter_by(status='active').first()
+        if not game:
+            return jsonify({'error': 'No active game to stop'}), 400
+        
+        # Stop the game immediately
+        game.status = 'finished'
+        game.current_logo_id = None
+        game.round_start_time = None
+        
+        db.session.commit()
+        
+        logging.info("Game stopped by admin")
+        return jsonify({'success': True, 'message': 'Game stopped successfully'})
+        
+    except Exception as e:
+        logging.error(f"Error stopping game: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/admin/restart_game', methods=['POST'])
+def restart_game():
+    """Restart the game - reset everything and start fresh"""
+    try:
+        # End any existing games
+        active_games = Game.query.all()
+        for game in active_games:
+            game.status = 'finished'
+        
+        # Reset all team scores
+        teams = Team.query.all()
+        for team in teams:
+            team.score = 0
+        
+        # Clear all guesses
+        guesses = Guess.query.all()
+        for guess in guesses:
+            db.session.delete(guess)
+        
+        # Get available logos
+        logos = Logo.query.all()
+        if not logos:
+            return jsonify({'error': 'No logos available. Please add logos first.'}), 400
+        
+        # Create new game - single round with all questions
+        questions_per_round = len(logos)  # All questions in one round
+        total_rounds = 1  # Only one round
+        game = Game(
+            status='active',
+            current_round=1,
+            total_rounds=total_rounds,
+            current_question=1,
+            questions_per_round=questions_per_round,
+            used_logo_ids='[]',
+            created_at=datetime.utcnow()
+        )
+        db.session.add(game)
+        db.session.flush()  # Get the game ID
+        
+        # Start first round
+        game_manager.start_round(game, logos)
+        
+        db.session.commit()
+        
+        logging.info("Game restarted by admin")
+        return jsonify({'success': True, 'game_id': game.id, 'message': 'Game restarted successfully'})
+        
+    except Exception as e:
+        logging.error(f"Error restarting game: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
 if __name__ == '__main__':

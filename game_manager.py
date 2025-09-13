@@ -50,15 +50,15 @@ class GameManager:
             return None
     
     def advance_question(self, game, logos):
-        """Advance to next question or complete round"""
+        """Advance to next question or complete game"""
         try:
             if game.current_question < game.questions_per_round:
                 # Move to next question in same round
                 game.current_question += 1
                 return self.start_question(game, logos)
             else:
-                # Round complete - wait for admin
-                game.status = 'round_complete'
+                # All questions complete - end the game
+                game.status = 'finished'
                 game.current_logo_id = None
                 game.round_start_time = None
                 return None

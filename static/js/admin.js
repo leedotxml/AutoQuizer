@@ -21,6 +21,8 @@ class AdminDashboard {
             timeProgress: document.getElementById('timeProgress'),
             timeRemaining: document.getElementById('timeRemaining'),
             startGameBtn: document.getElementById('startGameBtn'),
+            stopGameBtn: document.getElementById('stopGameBtn'),
+            restartGameBtn: document.getElementById('restartGameBtn'),
             nextRoundBtn: document.getElementById('nextRoundBtn'),
             teamsContainer: document.getElementById('teamsContainer'),
             logosContainer: document.getElementById('logosContainer'),
@@ -37,6 +39,14 @@ class AdminDashboard {
         
         if (this.elements.nextRoundBtn) {
             this.elements.nextRoundBtn.addEventListener('click', () => this.nextRound());
+        }
+        
+        if (this.elements.stopGameBtn) {
+            this.elements.stopGameBtn.addEventListener('click', () => this.stopGame());
+        }
+        
+        if (this.elements.restartGameBtn) {
+            this.elements.restartGameBtn.addEventListener('click', () => this.restartGame());
         }
         
         // Add logo form
@@ -86,6 +96,8 @@ class AdminDashboard {
             this.elements.currentStatus.className = 'badge bg-secondary';
             this.elements.roundInfo.style.display = 'none';
             this.elements.startGameBtn.style.display = 'inline-block';
+            this.elements.stopGameBtn.style.display = 'none';
+            this.elements.restartGameBtn.style.display = 'none';
             this.elements.nextRoundBtn.style.display = 'none';
             this.clearTimer();
             return;
@@ -96,11 +108,15 @@ class AdminDashboard {
             this.elements.currentStatus.textContent = 'Game Active';
             this.elements.currentStatus.className = 'badge bg-success';
             this.elements.startGameBtn.style.display = 'none';
+            this.elements.stopGameBtn.style.display = 'inline-block';
+            this.elements.restartGameBtn.style.display = 'inline-block';
             this.elements.nextRoundBtn.style.display = 'none';
         } else if (game.status === 'active' && !game.round_active) {
             this.elements.currentStatus.textContent = 'Question Complete - Auto Advancing';
             this.elements.currentStatus.className = 'badge bg-warning';
             this.elements.startGameBtn.style.display = 'none';
+            this.elements.stopGameBtn.style.display = 'inline-block';
+            this.elements.restartGameBtn.style.display = 'inline-block';
             this.elements.nextRoundBtn.style.display = 'none';
         } else if (game.status === 'round_complete') {
             this.elements.currentStatus.textContent = 'Round Complete - Waiting';
@@ -111,6 +127,8 @@ class AdminDashboard {
             this.elements.currentStatus.textContent = 'Game Finished';
             this.elements.currentStatus.className = 'badge bg-info';
             this.elements.startGameBtn.style.display = 'inline-block';
+            this.elements.stopGameBtn.style.display = 'none';
+            this.elements.restartGameBtn.style.display = 'inline-block';
             this.elements.nextRoundBtn.style.display = 'none';
         }
         
@@ -447,6 +465,76 @@ class AdminDashboard {
         } catch (error) {
             console.error('Failed to delete logo:', error);
             alert('Failed to delete logo. Please try again.');
+        }
+    }
+    
+    async stopGame() {
+        if (!confirm('Are you sure you want to stop the current game? This will end the game immediately.')) {
+            return;
+        }
+        
+        try {
+            this.elements.stopGameBtn.disabled = true;
+            this.elements.stopGameBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Stopping...';
+            
+            const response = await fetch('/api/admin/stop_game', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                alert('Game stopped successfully!');
+                // Update immediately
+                this.updateStatus();
+            } else {
+                alert(data.error || 'Failed to stop game');
+            }
+            
+        } catch (error) {
+            console.error('Failed to stop game:', error);
+            alert('Failed to stop game. Please try again.');
+        } finally {
+            this.elements.stopGameBtn.disabled = false;
+            this.elements.stopGameBtn.innerHTML = '<i class="fas fa-stop me-2"></i>Stop Game';
+        }
+    }
+    
+    async restartGame() {
+        if (!confirm('Are you sure you want to restart the game? This will reset all scores and start a fresh game.')) {
+            return;
+        }
+        
+        try {
+            this.elements.restartGameBtn.disabled = true;
+            this.elements.restartGameBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Restarting...';
+            
+            const response = await fetch('/api/admin/restart_game', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                alert('Game restarted successfully!');
+                // Update immediately
+                this.updateStatus();
+            } else {
+                alert(data.error || 'Failed to restart game');
+            }
+            
+        } catch (error) {
+            console.error('Failed to restart game:', error);
+            alert('Failed to restart game. Please try again.');
+        } finally {
+            this.elements.restartGameBtn.disabled = false;
+            this.elements.restartGameBtn.innerHTML = '<i class="fas fa-redo me-2"></i>Restart Game';
         }
     }
     
