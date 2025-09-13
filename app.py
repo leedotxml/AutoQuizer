@@ -719,5 +719,47 @@ def restart_game():
         logging.error(f"Error restarting game: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
+@app.route('/api/admin/team/<int:team_id>', methods=['DELETE'])
+def remove_team(team_id):
+    """Remove a team and all associated data"""
+    try:
+        # Find the team
+        team = Team.query.get(team_id)
+        if not team:
+            return jsonify({'error': 'Team not found'}), 404
+        
+        team_name = team.name
+        
+        # Begin transaction - remove all associated data first
+        # Remove all guesses made by this team
+        deleted_guesses = Guess.query.filter_by(team_id=team_id).delete(synchronize_session=False)
+        
+        # Remove the team itself
+        db.session.delete(team)
+        
+        # Commit the transaction
+        db.session.commit()
+        
+        # Check if we need to auto-advance after team removal
+        auto_advanced = False
+        game = Game.query.filter_by(status='active').first()
+        if game:
+            auto_advanced = check_and_auto_advance(game)
+        
+        logging.info(f"Removed team '{team_name}' (ID: {team_id}) and {deleted_guesses} associated guesses")
+        
+        return jsonify({
+            'success': True, 
+            'removed_team_id': team_id,
+            'team_name': team_name,
+            'auto_advanced': auto_advanced,
+            'message': f'Team "{team_name}" removed successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error removing team: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

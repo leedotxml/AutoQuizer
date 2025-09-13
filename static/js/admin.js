@@ -255,7 +255,7 @@ class AdminDashboard {
         // Sort teams by score (descending)
         const sortedTeams = teams.sort((a, b) => b.score - a.score);
         
-        let html = '<div class="table-responsive"><table class="table table-striped"><thead><tr><th>Rank</th><th>Team</th><th>Members</th><th>Score</th></tr></thead><tbody>';
+        let html = '<div class="table-responsive"><table class="table table-striped"><thead><tr><th>Rank</th><th>Team</th><th>Members</th><th>Score</th><th>Actions</th></tr></thead><tbody>';
         
         sortedTeams.forEach((team, index) => {
             const rankIcon = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
@@ -266,6 +266,11 @@ class AdminDashboard {
                     <td><strong>${team.name}</strong></td>
                     <td><small>${team.members.join(', ')}</small></td>
                     <td><span class="badge bg-primary">${team.score}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-danger" onclick="adminDashboard.removeTeam(${team.id})" title="Remove Team">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
                 </tr>
             `;
         });
@@ -535,6 +540,35 @@ class AdminDashboard {
         } finally {
             this.elements.restartGameBtn.disabled = false;
             this.elements.restartGameBtn.innerHTML = '<i class="fas fa-redo me-2"></i>Restart Game';
+        }
+    }
+    
+    async removeTeam(teamId) {
+        if (!confirm('Are you sure you want to remove this team? This will delete all their data and progress permanently.')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/admin/team/${teamId}`, {
+                method: 'DELETE'
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                alert(`Team "${data.team_name}" removed successfully!`);
+                if (data.auto_advanced) {
+                    alert('Game automatically advanced to the next question after team removal.');
+                }
+                // Update immediately to remove team from UI
+                this.updateStatus();
+            } else {
+                alert(data.error || 'Failed to remove team');
+            }
+            
+        } catch (error) {
+            console.error('Failed to remove team:', error);
+            alert('Failed to remove team. Please try again.');
         }
     }
     
