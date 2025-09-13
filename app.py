@@ -33,6 +33,95 @@ db.init_app(app)
 # Initialize game manager
 game_manager = GameManager()
 
+# Predefined list of dummy answers for teams that don't guess
+DUMMY_ANSWERS = [
+    "apple", "banana", "orange", "purple", "green", "blue", "red", "yellow",
+    "cat", "dog", "bird", "fish", "tree", "flower", "house", "car",
+    "book", "pen", "table", "chair", "window", "door", "water", "fire",
+    "moon", "star", "sun", "cloud", "rain", "snow", "wind", "earth",
+    "music", "dance", "sing", "play", "run", "walk", "jump", "swim",
+    "happy", "sad", "good", "bad", "big", "small", "fast", "slow"
+]
+
+def check_and_auto_advance(game):
+    """Check if all teams have guessed and auto-advance if so"""
+    try:
+        import random
+        
+        # Get all registered teams
+        all_teams = Team.query.all()
+        if not all_teams:
+            return False
+        
+        # Count how many teams have guessed for the current logo
+        logo_id_str = str(game.current_logo_id)
+        teams_guessed = Guess.query.filter(
+            Guess.game_id == game.id,
+            Guess.round_number == game.current_round,
+            Guess.guess.like(f'%{logo_id_str}%')
+        ).count()
+        
+        logging.info(f"Teams guessed: {teams_guessed}/{len(all_teams)} for question {game.current_question}")
+        
+        if teams_guessed >= len(all_teams):
+            # All teams have guessed, advance immediately
+            logos = Logo.query.all()
+            game_manager.advance_question(game, logos)
+            db.session.commit()
+            logging.info(f"Auto-advanced to next question - all teams guessed")
+            return True
+        
+        return False
+        
+    except Exception as e:
+        logging.error(f"Error in check_and_auto_advance: {e}")
+        return False
+
+def submit_dummy_answers_for_missing_teams(game):
+    """Submit dummy answers for teams that haven't guessed yet"""
+    try:
+        import random
+        
+        # Get all registered teams
+        all_teams = Team.query.all()
+        if not all_teams:
+            return
+        
+        # Find teams that haven't guessed for the current logo
+        logo_id_str = str(game.current_logo_id)
+        teams_that_guessed = set()
+        
+        existing_guesses = Guess.query.filter(
+            Guess.game_id == game.id,
+            Guess.round_number == game.current_round,
+            Guess.guess.like(f'%{logo_id_str}%')
+        ).all()
+        
+        for guess in existing_guesses:
+            teams_that_guessed.add(guess.team_id)
+        
+        # Submit dummy answers for teams that haven't guessed
+        for team in all_teams:
+            if team.id not in teams_that_guessed:
+                dummy_answer = random.choice(DUMMY_ANSWERS)
+                guess_with_id = f"{dummy_answer}_{game.current_logo_id}"
+                
+                dummy_guess = Guess(
+                    team_id=team.id,
+                    game_id=game.id,
+                    round_number=game.current_round,
+                    guess=guess_with_id,
+                    is_correct=False,  # Dummy answers are always incorrect
+                    timestamp=datetime.utcnow()
+                )
+                db.session.add(dummy_guess)
+                logging.info(f"Added dummy answer '{dummy_answer}' for team '{team.name}'")
+        
+        db.session.commit()
+        
+    except Exception as e:
+        logging.error(f"Error submitting dummy answers: {e}")
+
 # Create tables and load sample data
 with app.app_context():
     db.create_all()
@@ -229,10 +318,15 @@ def submit_guess():
         db.session.commit()
         
         logging.info(f"Team '{team_name}' guessed '{guess}' - {'Correct' if is_correct else 'Incorrect'}")
+        
+        # Check if all teams have now guessed for this question
+        auto_advanced = check_and_auto_advance(game)
+        
         return jsonify({
             'success': True,
             'is_correct': is_correct,
-            'correct_answer': logo.correct_answer if is_correct else None
+            'correct_answer': logo.correct_answer if is_correct else None,
+            'auto_advanced': auto_advanced
         })
         
     except Exception as e:
@@ -457,6 +551,9 @@ def next_question():
         game = Game.query.filter_by(status='active').first()
         if not game:
             return jsonify({'error': 'No active game'}), 400
+        
+        # Before advancing, submit dummy answers for teams that haven't guessed
+        submit_dummy_answers_for_missing_teams(game)
         
         logos = Logo.query.all()
         result = game_manager.advance_question(game, logos)
