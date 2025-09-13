@@ -273,6 +273,12 @@ def get_team_status(team_name):
             ).first()
             has_guessed = existing_guess is not None
         
+        # Calculate time remaining
+        time_remaining = 0
+        if game.round_start_time:
+            elapsed = (datetime.utcnow() - game.round_start_time).total_seconds()
+            time_remaining = max(0, 30 - elapsed)
+        
         return jsonify({
             'game_status': game.status,
             'current_round': game.current_round,
@@ -282,7 +288,8 @@ def get_team_status(team_name):
             'team_score': team.score,
             'logo_url': logo.image_url if logo else None,
             'has_guessed': has_guessed,
-            'round_active': game.status == 'active'
+            'time_remaining': int(time_remaining),
+            'round_active': time_remaining > 0 and game.status == 'active'
         })
         
     except Exception as e:
@@ -330,6 +337,12 @@ def get_admin_status():
         
         game_data = None
         if game:
+            # Calculate time remaining
+            time_remaining = 0
+            if game.round_start_time:
+                elapsed = (datetime.utcnow() - game.round_start_time).total_seconds()
+                time_remaining = max(0, 30 - elapsed)
+            
             current_logo = None
             if game.current_logo_id:
                 logo = Logo.query.get(game.current_logo_id)
@@ -349,7 +362,8 @@ def get_admin_status():
                 'current_question': getattr(game, 'current_question', 1),
                 'questions_per_round': getattr(game, 'questions_per_round', 10),
                 'current_logo': current_logo,
-                'round_active': game.status == 'active'
+                'time_remaining': int(time_remaining),
+                'round_active': time_remaining > 0 and game.status == 'active'
             }
         
         return jsonify({
@@ -438,7 +452,7 @@ def next_round():
 
 @app.route('/api/admin/next_question', methods=['POST'])
 def next_question():
-    """Manually advance to the next question"""
+    """Advance to the next question (automatic after 30 seconds)"""
     try:
         game = Game.query.filter_by(status='active').first()
         if not game:

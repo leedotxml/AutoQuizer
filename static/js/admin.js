@@ -2,6 +2,8 @@ class AdminDashboard {
     constructor() {
         this.currentGameState = null;
         this.updateInterval = null;
+        this.timerInterval = null;
+        this.autoProgressInterval = null;
         
         this.initializeElements();
         this.bindEvents();
@@ -16,10 +18,11 @@ class AdminDashboard {
             totalRounds: document.getElementById('totalRounds'),
             currentQuestion: document.getElementById('currentQuestion'),
             questionsPerRound: document.getElementById('questionsPerRound'),
+            timeProgress: document.getElementById('timeProgress'),
+            timeRemaining: document.getElementById('timeRemaining'),
             startGameBtn: document.getElementById('startGameBtn'),
             stopGameBtn: document.getElementById('stopGameBtn'),
             restartGameBtn: document.getElementById('restartGameBtn'),
-            nextQuestionBtn: document.getElementById('nextQuestionBtn'),
             nextRoundBtn: document.getElementById('nextRoundBtn'),
             teamsContainer: document.getElementById('teamsContainer'),
             logosContainer: document.getElementById('logosContainer'),
@@ -46,10 +49,6 @@ class AdminDashboard {
             this.elements.restartGameBtn.addEventListener('click', () => this.restartGame());
         }
         
-        if (this.elements.nextQuestionBtn) {
-            this.elements.nextQuestionBtn.addEventListener('click', () => this.nextQuestion());
-        }
-        
         // Add logo form
         if (this.elements.addLogoForm) {
             this.elements.addLogoForm.addEventListener('submit', (e) => {
@@ -69,17 +68,10 @@ class AdminDashboard {
     async updateStatus() {
         try {
             const response = await fetch('/api/admin/status');
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error(`Status request failed: ${response.status} ${response.statusText}`, errorText);
-                return;
-            }
-            
             const data = await response.json();
             
             if (data.error) {
-                console.error('Server Error:', data.error);
+                console.error('Error:', data.error);
                 return;
             }
             
@@ -88,12 +80,6 @@ class AdminDashboard {
             
         } catch (error) {
             console.error('Failed to update status:', error);
-            // Log more details about the error
-            if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-                console.error('Network error - server may be unreachable');
-            } else if (error instanceof SyntaxError) {
-                console.error('JSON parsing error - server may have returned non-JSON response');
-            }
         }
     }
     
@@ -112,8 +98,8 @@ class AdminDashboard {
             this.elements.startGameBtn.style.display = 'inline-block';
             this.elements.stopGameBtn.style.display = 'none';
             this.elements.restartGameBtn.style.display = 'none';
-            this.elements.nextQuestionBtn.style.display = 'none';
             this.elements.nextRoundBtn.style.display = 'none';
+            this.clearTimer();
             return;
         }
         
@@ -124,15 +110,13 @@ class AdminDashboard {
             this.elements.startGameBtn.style.display = 'none';
             this.elements.stopGameBtn.style.display = 'inline-block';
             this.elements.restartGameBtn.style.display = 'inline-block';
-            this.elements.nextQuestionBtn.style.display = 'inline-block';
             this.elements.nextRoundBtn.style.display = 'none';
         } else if (game.status === 'active' && !game.round_active) {
-            this.elements.currentStatus.textContent = 'Question Complete - Manual Advance Required';
+            this.elements.currentStatus.textContent = 'Question Complete - Auto Advancing';
             this.elements.currentStatus.className = 'badge bg-warning';
             this.elements.startGameBtn.style.display = 'none';
             this.elements.stopGameBtn.style.display = 'inline-block';
             this.elements.restartGameBtn.style.display = 'inline-block';
-            this.elements.nextQuestionBtn.style.display = 'inline-block';
             this.elements.nextRoundBtn.style.display = 'none';
         } else if (game.status === 'round_complete') {
             this.elements.currentStatus.textContent = 'Round Complete - Waiting';
@@ -145,7 +129,6 @@ class AdminDashboard {
             this.elements.startGameBtn.style.display = 'inline-block';
             this.elements.stopGameBtn.style.display = 'none';
             this.elements.restartGameBtn.style.display = 'inline-block';
-            this.elements.nextQuestionBtn.style.display = 'none';
             this.elements.nextRoundBtn.style.display = 'none';
         }
         
@@ -156,6 +139,14 @@ class AdminDashboard {
             this.elements.totalRounds.textContent = game.total_rounds;
             this.elements.currentQuestion.textContent = game.current_question || 1;
             this.elements.questionsPerRound.textContent = game.questions_per_round || 10;
+            
+            // Update timer
+            this.updateTimer(game.time_remaining);
+            
+            // Set up automatic question progression for active games
+            if (game.status === 'active') {
+                this.setupAutoProgress(game.time_remaining);
+            }
             
             // Update next round button
             if (game.current_round >= game.total_rounds) {
@@ -169,14 +160,25 @@ class AdminDashboard {
             }
         } else {
             this.elements.roundInfo.style.display = 'none';
+            this.clearTimer();
+            this.clearAutoProgress();
         }
     }
     
-    async nextQuestion() {
+    setupAutoProgress(timeRemaining) {
+        // Clear existing auto-progress
+        this.clearAutoProgress();
+        
+        // Set timer to advance question when time runs out
+        if (timeRemaining > 0) {
+            this.autoProgressInterval = setTimeout(() => {
+                this.advanceQuestion();
+            }, timeRemaining * 1000);
+        }
+    }
+    
+    async advanceQuestion() {
         try {
-            this.elements.nextQuestionBtn.disabled = true;
-            this.elements.nextQuestionBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Advancing...';
-            
             const response = await fetch('/api/admin/next_question', {
                 method: 'POST',
                 headers: {
@@ -187,24 +189,62 @@ class AdminDashboard {
             const data = await response.json();
             
             if (data.success) {
-                if (data.game_finished) {
-                    alert('Game completed! All questions have been answered.');
-                }
                 // Update immediately
                 this.updateStatus();
-            } else {
-                alert(data.error || 'Failed to advance question');
             }
-            
         } catch (error) {
             console.error('Failed to advance question:', error);
-            alert('Failed to advance question. Please try again.');
-        } finally {
-            this.elements.nextQuestionBtn.disabled = false;
-            this.elements.nextQuestionBtn.innerHTML = '<i class="fas fa-forward me-2"></i>Next Question';
         }
     }
     
+    clearAutoProgress() {
+        if (this.autoProgressInterval) {
+            clearTimeout(this.autoProgressInterval);
+            this.autoProgressInterval = null;
+        }
+    }
+    
+    updateTimer(timeRemaining) {
+        const totalTime = 30;
+        const progressPercent = (timeRemaining / totalTime) * 100;
+        
+        this.elements.timeProgress.style.width = `${progressPercent}%`;
+        this.elements.timeRemaining.textContent = `${Math.ceil(timeRemaining)}s`;
+        
+        // Change color based on time remaining
+        this.elements.timeProgress.className = 'progress-bar';
+        if (timeRemaining <= 10) {
+            this.elements.timeProgress.classList.add('bg-danger');
+        } else if (timeRemaining <= 20) {
+            this.elements.timeProgress.classList.add('bg-warning');
+        } else {
+            this.elements.timeProgress.classList.add('bg-success');
+        }
+        
+        // Clear existing timer
+        this.clearTimer();
+        
+        // Start countdown timer
+        if (timeRemaining > 0) {
+            this.timerInterval = setInterval(() => {
+                timeRemaining--;
+                const newProgressPercent = (timeRemaining / totalTime) * 100;
+                this.elements.timeProgress.style.width = `${newProgressPercent}%`;
+                this.elements.timeRemaining.textContent = `${Math.ceil(Math.max(0, timeRemaining))}s`;
+                
+                if (timeRemaining <= 0) {
+                    this.clearTimer();
+                }
+            }, 1000);
+        }
+    }
+    
+    clearTimer() {
+        if (this.timerInterval) {
+            clearInterval(this.timerInterval);
+            this.timerInterval = null;
+        }
+    }
     
     updateTeams(teams) {
         if (!teams || teams.length === 0) {
@@ -502,6 +542,8 @@ class AdminDashboard {
         if (this.updateInterval) {
             clearInterval(this.updateInterval);
         }
+        this.clearTimer();
+        this.clearAutoProgress();
     }
 }
 

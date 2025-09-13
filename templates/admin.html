@@ -45,6 +45,11 @@
                                     <div id="roundInfo" style="display: none;">
                                         <p class="mb-1">Round: <span id="currentRound">-</span> of <span id="totalRounds">-</span></p>
                                         <p class="mb-1">Question: <span id="currentQuestion">-</span> of <span id="questionsPerRound">10</span></p>
+                                        <div class="progress mb-2" style="height: 20px;">
+                                            <div class="progress-bar" id="timeProgress" role="progressbar" style="width: 100%">
+                                                <span id="timeRemaining">30s</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -60,10 +65,6 @@
                                 <button class="btn btn-warning btn-lg me-2" id="restartGameBtn" style="display: none;">
                                     <i class="fas fa-redo me-2"></i>
                                     Restart Game
-                                </button>
-                                <button class="btn btn-info btn-lg me-2" id="nextQuestionBtn" style="display: none;">
-                                    <i class="fas fa-forward me-2"></i>
-                                    Next Question
                                 </button>
                                 <button class="btn btn-primary btn-lg" id="nextRoundBtn" style="display: none;">
                                     <i class="fas fa-forward me-2"></i>

@@ -37,6 +37,7 @@ class GameManager:
             if available_logos:
                 selected_logo = random.choice(available_logos)
                 game.current_logo_id = selected_logo.id
+                game.round_start_time = datetime.utcnow()
                 
                 # Update used logos
                 used_logo_ids.append(selected_logo.id)
@@ -59,7 +60,24 @@ class GameManager:
                 # All questions complete - end the game
                 game.status = 'finished'
                 game.current_logo_id = None
+                game.round_start_time = None
                 return None
         except Exception as e:
             print(f"Error advancing question: {e}")
             return None
+    
+    def is_round_expired(self, game):
+        """Check if the current round has expired (30 seconds)"""
+        if not game.round_start_time:
+            return False
+        
+        elapsed = (datetime.utcnow() - game.round_start_time).total_seconds()
+        return elapsed >= 30
+    
+    def get_time_remaining(self, game):
+        """Get remaining time for current round"""
+        if not game.round_start_time:
+            return 0
+        
+        elapsed = (datetime.utcnow() - game.round_start_time).total_seconds()
+        return max(0, 30 - elapsed)
