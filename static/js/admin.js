@@ -69,10 +69,17 @@ class AdminDashboard {
     async updateStatus() {
         try {
             const response = await fetch('/api/admin/status');
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`Status request failed: ${response.status} ${response.statusText}`, errorText);
+                return;
+            }
+            
             const data = await response.json();
             
             if (data.error) {
-                console.error('Error:', data.error);
+                console.error('Server Error:', data.error);
                 return;
             }
             
@@ -81,6 +88,12 @@ class AdminDashboard {
             
         } catch (error) {
             console.error('Failed to update status:', error);
+            // Log more details about the error
+            if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+                console.error('Network error - server may be unreachable');
+            } else if (error instanceof SyntaxError) {
+                console.error('JSON parsing error - server may have returned non-JSON response');
+            }
         }
     }
     
