@@ -82,4 +82,4 @@ curl -sSL https://raw.githubusercontent.com/your-repo/car-logo-game/main/install
    ```bash
    export SESSION_SECRET="your-secret-key-here"
    export DATABASE_URL="sqlite:///game.db"
-   
+   # AutoQuizer
