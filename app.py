@@ -339,14 +339,10 @@ def submit_guess():
         
         logging.info(f"Team '{team_name}' guessed '{guess}' - {'Correct' if is_correct else 'Incorrect'}")
         
-        # Check if all teams have now guessed for this question
-        auto_advanced = check_and_auto_advance(game)
-        
         return jsonify({
             'success': True,
             'is_correct': is_correct,
-            'correct_answer': logo.correct_answer if is_correct else None,
-            'auto_advanced': auto_advanced
+            'correct_answer': logo.correct_answer if is_correct else None
         })
         
     except Exception as e:
