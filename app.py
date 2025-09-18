@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
 from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
-from models import db, Team, Logo, Game, Guess
+from models import db, Team, Logo, Game, Guess, GameTeam
 from game_manager import GameManager
 
 # Configure logging
@@ -44,31 +44,28 @@ DUMMY_ANSWERS = [
 ]
 
 def check_and_auto_advance(game):
-    """Check if all teams have guessed and auto-advance if so"""
+    """Check if all participating teams have guessed and auto-advance if so"""
     try:
-        import random
-        
-        # Get all registered teams
-        all_teams = Team.query.all()
-        if not all_teams:
+        # Get participating teams for this game
+        participating_teams = GameTeam.query.filter_by(game_id=game.id).all()
+        if not participating_teams:
             return False
         
-        # Count how many teams have guessed for the current logo
-        logo_id_str = str(game.current_logo_id)
+        # Count how many participating teams have guessed for the current logo
         teams_guessed = Guess.query.filter(
             Guess.game_id == game.id,
             Guess.round_number == game.current_round,
-            Guess.guess.like(f'%{logo_id_str}%')
+            Guess.logo_id == game.current_logo_id
         ).count()
         
-        logging.info(f"Teams guessed: {teams_guessed}/{len(all_teams)} for question {game.current_question}")
+        logging.info(f"Teams guessed: {teams_guessed}/{len(participating_teams)} for question {game.current_question}")
         
-        if teams_guessed >= len(all_teams):
-            # All teams have guessed, advance immediately
+        if teams_guessed >= len(participating_teams):
+            # All participating teams have guessed, advance immediately
             logos = Logo.query.all()
             game_manager.advance_question(game, logos)
             db.session.commit()
-            logging.info(f"Auto-advanced to next question - all teams guessed")
+            logging.info(f"Auto-advanced to next question - all participating teams guessed")
             return True
         
         return False
@@ -78,39 +75,40 @@ def check_and_auto_advance(game):
         return False
 
 def submit_dummy_answers_for_missing_teams(game):
-    """Submit dummy answers for teams that haven't guessed yet"""
+    """Submit dummy answers for participating teams that haven't guessed yet"""
     try:
         import random
         
-        # Get all registered teams
-        all_teams = Team.query.all()
-        if not all_teams:
+        # Get participating teams for this game
+        participating_teams = GameTeam.query.filter_by(game_id=game.id).all()
+        if not participating_teams:
             return
         
         # Find teams that haven't guessed for the current logo
-        logo_id_str = str(game.current_logo_id)
         teams_that_guessed = set()
         
         existing_guesses = Guess.query.filter(
             Guess.game_id == game.id,
             Guess.round_number == game.current_round,
-            Guess.guess.like(f'%{logo_id_str}%')
+            Guess.logo_id == game.current_logo_id
         ).all()
         
         for guess in existing_guesses:
             teams_that_guessed.add(guess.team_id)
         
-        # Submit dummy answers for teams that haven't guessed
-        for team in all_teams:
-            if team.id not in teams_that_guessed:
+        # Submit dummy answers for participating teams that haven't guessed
+        for game_team in participating_teams:
+            if game_team.team_id not in teams_that_guessed:
+                team = Team.query.get(game_team.team_id)
                 dummy_answer = random.choice(DUMMY_ANSWERS)
-                guess_with_id = f"{dummy_answer}_{game.current_logo_id}"
                 
                 dummy_guess = Guess(
-                    team_id=team.id,
+                    team_id=game_team.team_id,
                     game_id=game.id,
                     round_number=game.current_round,
-                    guess=guess_with_id,
+                    logo_id=game.current_logo_id,
+                    question_number=game.current_question,
+                    guess_text=dummy_answer,
                     is_correct=False,  # Dummy answers are always incorrect
                     timestamp=datetime.utcnow()
                 )
@@ -270,14 +268,17 @@ def submit_guess():
         if not game:
             return jsonify({'error': 'No active game'}), 400
         
-        # Simple approach: Allow one guess per question per team per game
-        # Check based on current logo ID to track questions
-        logo_id_str = str(game.current_logo_id) 
+        # Check if team is participating in the current game
+        game_team = GameTeam.query.filter_by(game_id=game.id, team_id=team.id).first()
+        if not game_team:
+            return jsonify({'error': 'Team is not participating in the current game'}), 400
+        
+        # Check if team has already guessed for this question
         existing_guess = Guess.query.filter(
             Guess.team_id == team.id,
             Guess.game_id == game.id,
             Guess.round_number == game.current_round,
-            Guess.guess.like(f'%{logo_id_str}%')
+            Guess.logo_id == game.current_logo_id
         ).first()
         
         if existing_guess:
@@ -299,13 +300,14 @@ def submit_guess():
         
         is_correct = guess in correct_answers
         
-        # Save guess with logo ID to track questions properly
-        guess_with_id = f"{guess}_{game.current_logo_id}"
+        # Save guess with proper fields
         guess_obj = Guess(
             team_id=team.id,
             game_id=game.id,
             round_number=game.current_round,
-            guess=guess_with_id,
+            logo_id=game.current_logo_id,
+            question_number=game.current_question,
+            guess_text=guess,
             is_correct=is_correct,
             timestamp=datetime.utcnow()
         )
@@ -358,12 +360,11 @@ def get_team_status(team_name):
         # Check if team has guessed for this specific logo 
         has_guessed = False
         if game and logo:
-            logo_id_str = str(game.current_logo_id)
             existing_guess = Guess.query.filter(
                 Guess.team_id == team.id,
                 Guess.game_id == game.id,
                 Guess.round_number == game.current_round,
-                Guess.guess.like(f'%{logo_id_str}%')
+                Guess.logo_id == game.current_logo_id
             ).first()
             has_guessed = existing_guess is not None
         
@@ -503,6 +504,15 @@ def start_game():
         )
         db.session.add(game)
         db.session.flush()  # Get the game ID
+        
+        # Enroll all existing teams as participants in this game
+        teams = Team.query.all()
+        for team in teams:
+            game_team = GameTeam(
+                game_id=game.id,
+                team_id=team.id
+            )
+            db.session.add(game_team)
         
         # Start first round
         game_manager.start_round(game, logos)
