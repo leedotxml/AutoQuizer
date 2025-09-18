@@ -109,6 +109,7 @@ def submit_dummy_answers_for_missing_teams(game):
                     logo_id=game.current_logo_id,
                     question_number=game.current_question,
                     guess_text=dummy_answer,
+                    guess=f"{dummy_answer}_{game.current_logo_id}",  # Legacy field for compatibility
                     is_correct=False,  # Dummy answers are always incorrect
                     timestamp=datetime.utcnow()
                 )
@@ -139,7 +140,23 @@ with app.app_context():
             db.session.commit()
             logging.info("Database schema updated with new game features")
     except Exception as e:
-        logging.warning(f"Schema migration skipped: {e}")
+        logging.warning(f"Game schema migration skipped: {e}")
+    
+    # Handle database schema migration for new guess tracking features
+    try:
+        # Check if we need to add new columns to guess table
+        result = db.session.execute(text("PRAGMA table_info(guess)"))
+        columns = [row[1] for row in result.fetchall()]
+        
+        if 'logo_id' not in columns:
+            # Add new columns for proper guess tracking
+            db.session.execute(text("ALTER TABLE guess ADD COLUMN logo_id INTEGER"))
+            db.session.execute(text("ALTER TABLE guess ADD COLUMN question_number INTEGER"))
+            db.session.execute(text("ALTER TABLE guess ADD COLUMN guess_text TEXT"))
+            db.session.commit()
+            logging.info("Database schema updated with new guess tracking features")
+    except Exception as e:
+        logging.warning(f"Guess schema migration skipped: {e}")
     
     # Load sample logos if none exist
     try:
@@ -308,6 +325,7 @@ def submit_guess():
             logo_id=game.current_logo_id,
             question_number=game.current_question,
             guess_text=guess,
+            guess=f"{guess}_{game.current_logo_id}",  # Legacy field for compatibility
             is_correct=is_correct,
             timestamp=datetime.utcnow()
         )
