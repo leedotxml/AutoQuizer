@@ -370,6 +370,29 @@ def get_team_status(team_name):
                 'message': 'Waiting for game to start...'
             })
         
+        # Check if we need to auto-advance due to timer expiry
+        if game.round_start_time:
+            elapsed = (datetime.utcnow() - game.round_start_time).total_seconds()
+            if elapsed >= 30:
+                # Timer expired - auto advance question
+                try:
+                    submit_dummy_answers_for_missing_teams(game)
+                    logos = Logo.query.all()
+                    game_manager.advance_question(game, logos)
+                    db.session.commit()
+                    logging.info(f"Auto-advanced to next question due to timer expiry")
+                except Exception as e:
+                    logging.error(f"Error in auto-advance: {e}")
+        
+        # Reload game state after potential auto-advance
+        game = Game.query.filter_by(status='active').first()
+        if not game:
+            return jsonify({
+                'game_status': 'finished',
+                'team_score': team.score,
+                'message': 'Game has ended'
+            })
+        
         # Get current logo
         logo = None
         if game.current_logo_id:
