@@ -186,13 +186,9 @@ def index():
     """Landing page with team registration"""
     return render_template('index.html')
 
-@app.route('/team/<path:team_name>')
+@app.route('/team/<team_name>')
 def team_dashboard(team_name):
     """Team dashboard for playing the game"""
-    # URL decode the team name to handle special characters like apostrophes
-    from urllib.parse import unquote
-    team_name = unquote(team_name)
-    
     team = Team.query.filter_by(name=team_name).first()
     if not team:
         flash('Team not found. Please register first.', 'error')
@@ -240,6 +236,11 @@ def register_team():
         
         if not team_name:
             return jsonify({'error': 'Team name is required'}), 400
+        
+        # Validate team name - only allow alphanumeric characters, spaces, and hyphens
+        import re
+        if not re.match(r'^[a-zA-Z0-9\s\-]+$', team_name):
+            return jsonify({'error': 'Team name can only contain letters, numbers, spaces, and hyphens'}), 400
         
         if not members or len(members) == 0:
             return jsonify({'error': 'At least one team member is required'}), 400
