@@ -186,9 +186,13 @@ def index():
     """Landing page with team registration"""
     return render_template('index.html')
 
-@app.route('/team/<team_name>')
+@app.route('/team/<path:team_name>')
 def team_dashboard(team_name):
     """Team dashboard for playing the game"""
+    # URL decode the team name to handle special characters like apostrophes
+    from urllib.parse import unquote
+    team_name = unquote(team_name)
+    
     team = Team.query.filter_by(name=team_name).first()
     if not team:
         flash('Team not found. Please register first.', 'error')
