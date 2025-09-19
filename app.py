@@ -366,6 +366,22 @@ def get_team_status(team_name):
                 'message': 'Waiting for game to start...'
             })
         
+        # Check if team is enrolled in current game, and auto-enroll if not
+        game_team = GameTeam.query.filter_by(game_id=game.id, team_id=team.id).first()
+        if not game_team:
+            # Auto-enroll team in current active game
+            try:
+                game_team = GameTeam(
+                    game_id=game.id,
+                    team_id=team.id
+                )
+                db.session.add(game_team)
+                db.session.commit()
+                logging.info(f"Auto-enrolled team '{team.name}' in current active game")
+            except Exception as e:
+                logging.error(f"Error auto-enrolling team: {e}")
+                db.session.rollback()
+        
         # Check if we need to auto-advance due to timer expiry
         if game.round_start_time:
             elapsed = (datetime.utcnow() - game.round_start_time).total_seconds()
